@@ -12,7 +12,11 @@ cp web/.env.example web/.env
 npm run dev     # API sur :3001, front sur http://localhost:5173
 ```
 
-`npm test` lance les tests et les vérifications de types. `npm run db:reset` repart d'un praticien jamais inscrit.
+| Commande | Effet |
+|---|---|
+| `npm run dev` | API (Fastify, rechargement auto) + front (Vite) |
+| `npm test` | tests d'intégration de l'API, typecheck serveur et front, lint du front |
+| `npm run db:reset` | base vidée puis re-remplie : on repart d'un praticien jamais inscrit |
 
 ## Structure
 
@@ -27,7 +31,7 @@ web/      React + Vite + TanStack Query + Tailwind, un dossier par zone
 
 - **La checklist n'est jamais stockée.** Le serveur la recalcule à chaque appel à partir des faits.
 - **Reco test = drapeau.** `is_test` vient du patient et est copié sur la reco.
-- **Les events** passent par une liste fermée validée par zod, avec horodatage serveur et aucune durée stockée. Liste complète : `docs/events.md`. Page `/debug` pour les voir.
+- **Les events** passent par une liste fermée validée par zod, avec horodatage serveur et aucune durée stockée. Liste complète : `docs/events.md`. Endpoints : `docs/api.md`. Page `/debug` pour les voir.
 - **Suppression logique** (`deleted_at`) : ce qui a été fait reste fait pour la checklist.
 
 ## Volontairement simplifié
