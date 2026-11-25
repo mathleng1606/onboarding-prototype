@@ -30,13 +30,8 @@ export function FirstSteps({ onboarding, theme }: { onboarding: Onboarding; them
     setCollapsed(v);
   };
 
-  const favoritesDone = onboarding.items.find((i) => i.key === 'favorites')!.done;
-  // Screen 11: first recommendation real without the test, favorites not chosen yet → the full checklist
-  // with a « Bravo » line, instead of « tout est prêt » (which would contradict the remaining step).
-  const realFirst = onboarding.realFirstWithoutTest && !favoritesDone;
-
   if (onboarding.hidden) return null;
-  if (onboarding.closed && !realFirst) return <ChecklistDone onboarding={onboarding} t={theme} />;
+  if (onboarding.closed) return <ChecklistDone onboarding={onboarding} t={theme} />;
   if (collapsed) {
     return (
       <button
@@ -49,7 +44,7 @@ export function FirstSteps({ onboarding, theme }: { onboarding: Onboarding; them
       </button>
     );
   }
-  return <Checklist onboarding={onboarding} t={theme} realFirst={realFirst} onCollapse={() => collapse(true)} />;
+  return <Checklist onboarding={onboarding} t={theme} onCollapse={() => collapse(true)} />;
 }
 
 /** The checklist « X » collapses it until the end of this browser session. */
@@ -111,13 +106,10 @@ function CloseCard({ t, onClick }: { t: ChecklistTheme; onClick: () => void }) {
 function Checklist({
   onboarding,
   t,
-  realFirst,
   onCollapse,
 }: {
   onboarding: Onboarding;
   t: ChecklistTheme;
-  /** Show the « Bravo, votre première recommandation est partie ! » line (screen 11). */
-  realFirst: boolean;
   onCollapse: () => void;
 }) {
   const w = useWording();
@@ -166,16 +158,6 @@ function Checklist({
         </div>
       </div>
       <div className={cx('border-t', t.divider)}>
-        {realFirst && (
-          // Lighter background (surface-tint, or white 8 % in dark), bottom separator, no close button.
-          <div className={cx('flex gap-3 items-center py-3 px-4 min-h-12 box-border border-b', t.highlight, t.divider)}>
-            <StatusDot done t={t} />
-            <span className={cx('flex-1 min-w-0 text-sm', t.label)}>
-              <span className="font-semibold">{w.checklistRealFirstLead}</span>
-              {w.checklistRealFirstRest}
-            </span>
-          </div>
-        )}
         {onboarding.items.map(({ key, done }, i) => {
           const isNext = key === onboarding.nextItem;
           // Sub-text: on the next item, and on items 3 and 4 while they are not done.
@@ -217,19 +199,25 @@ function Checklist({
   );
 }
 
-/** State B: closed at the first real recommendation; item 3 stays as a discreet line if not done. */
+/**
+ * State B: closed at the first real recommendation, and can then be closed for good (even without favorites).
+ * Item 3 stays as a discreet line if not done.
+ * Screen 11: when that first recommendation was real without the test and favorites are not chosen,
+ * « Bravo, votre première recommandation est partie ! » replaces « tout est prêt » (which would contradict the remaining step).
+ */
 function ChecklistDone({ onboarding, t }: { onboarding: Onboarding; t: ChecklistTheme }) {
   const w = useWording();
   const refresh = useRefresh();
   const act = useItemAction();
   const favoritesDone = onboarding.items.find((i) => i.key === 'favorites')!.done;
+  const realFirst = onboarding.realFirstWithoutTest && !favoritesDone;
   useItemsViewed(favoritesDone ? [] : ['favorites']);
   return (
     <section aria-label="Vos premiers pas" className={cx('flex flex-wrap items-center gap-3 py-3 px-4 min-h-12 box-border rounded-lg', t.card)}>
       <StatusDot done t={t} />
       <span className={cx('flex-1 min-w-0 text-sm', t.label)}>
-        <span className="font-medium">{w.checklistDoneLead}</span>
-        {w.checklistDoneRest}
+        <span className="font-medium">{realFirst ? w.checklistRealFirstLead : w.checklistDoneLead}</span>
+        {realFirst ? w.checklistRealFirstRest : w.checklistDoneRest}
       </span>
       <CloseCard
         t={t}
