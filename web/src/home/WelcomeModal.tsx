@@ -47,7 +47,7 @@ export function WelcomeModal({ firstName }: { firstName: string }) {
         className="mt-4 shrink-0"
         onClick={async () => {
           await dismiss();
-          flow.startReco();
+          flow.startReco('guide');
         }}
       >
         {w.welcomeCta}

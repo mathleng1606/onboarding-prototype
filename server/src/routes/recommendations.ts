@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { parse } from '../lib.ts';
-import { recordEvent } from '../services/events.ts';
+import { z } from 'zod';
+import { RECO_SOURCES, recordEvent } from '../services/events.ts';
 import { computeOnboarding, withOnboardingTracking } from '../services/onboarding.ts';
 import { reloadPractitioner } from '../services/practitioners.ts';
 import {
@@ -15,6 +16,8 @@ import {
   updateReco,
 } from '../services/recommendations.ts';
 import { param, type RouteOptions } from './context.ts';
+
+const sendSchema = z.strictObject({ source: z.enum(RECO_SOURCES) });
 
 /** /api/practitioners/{uid}/recommendations */
 export const recommendationRoutes: FastifyPluginAsync<RouteOptions> = async (app, { db }) => {
@@ -36,12 +39,16 @@ export const recommendationRoutes: FastifyPluginAsync<RouteOptions> = async (app
     return reply.code(204).send();
   });
 
-  /** Returns the updated checklist too, so the front shows the new state without a second call. */
+  /**
+   * Returns the updated checklist too, so the front shows the new state without a second call.
+   * The body carries where the reco was started from (set by the front at reco_started).
+   */
   app.post('/:recoUid/send', async (req) => {
+    const { source } = parse(sendSchema, req.body);
     const p = req.practitioner;
     const recommendation = withOnboardingTracking(db, p, () => {
       const reco = sendReco(db, p, param(req, 'recoUid'));
-      recordEvent(db, p.id, 'recommendation_sent', { recommendationUid: reco.uid, patientUid: reco.patient.uid, isTest: reco.isTest }, 'server');
+      recordEvent(db, p.id, 'reco_sent', { is_test_patient: reco.isTest, source, n_products: reco.items.length }, 'server');
       return reco;
     });
     return { recommendation, onboarding: computeOnboarding(db, reloadPractitioner(db, p)) };

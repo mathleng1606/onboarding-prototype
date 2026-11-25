@@ -2,6 +2,9 @@ import { z } from 'zod';
 import type { DB } from '../db/index.ts';
 import { iso } from '../lib.ts';
 
+/** Where a recommendation was started from (reco_started, reco_sent). */
+export const RECO_SOURCES = ['guide', 'accueil', 'checklist', 'patients'] as const;
+
 export const eventSchema = z.strictObject({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, 'snake_case expected').max(64),
   props: z.record(z.string(), z.unknown()).default({}),

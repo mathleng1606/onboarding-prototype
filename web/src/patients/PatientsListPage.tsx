@@ -151,7 +151,7 @@ export function PatientsListPage() {
           <span className="hidden md:block px-2">{numericDate(p.createdAt)}</span>
           {/* The buttons must not open the patient page (click on the row). */}
           <span className="flex items-center gap-2 md:px-2 mt-3 md:mt-0" onClick={(e) => e.stopPropagation()}>
-            <Button variant="outline" className="max-md:flex-1" onClick={() => flow.startReco(p.uid)}>
+            <Button variant="outline" className="max-md:flex-1" onClick={() => flow.startReco('patients', p.uid)}>
               {w.newRecoTitle}
             </Button>
             <Button variant="danger" padding="none" className="w-9" aria-label={`Supprimer ${p.firstName} ${p.lastName}`} onClick={() => remove(p)}>

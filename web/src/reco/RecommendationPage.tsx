@@ -4,7 +4,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { ItemInput, Practitioner, Recommendation } from '../api/types';
 import { keys, useOnboarding, usePractitioner, useRefresh } from '../hooks/queries';
-import { useFlow } from '../lib/flow';
+import { currentRecoSource, useFlow } from '../lib/flow';
 import { useWording } from '../lib/wording';
 import { GuideBand } from '../ui';
 import { useToast } from '../ui/toast';
@@ -72,7 +72,7 @@ function Editor({ initial, practitioner, guideActive }: { initial: Recommendatio
 
   async function send() {
     await saveNote();
-    const res = await api.sendRecommendation(reco.uid);
+    const res = await api.sendRecommendation(reco.uid, currentRecoSource());
     refresh.onboarding(res.onboarding);
     await qc.invalidateQueries({ queryKey: ['recommendations'] });
     await qc.invalidateQueries({ queryKey: keys.patients });
@@ -105,7 +105,7 @@ function Editor({ initial, practitioner, guideActive }: { initial: Recommendatio
       {/* Mobile (app capture): 12 px side margins. */}
       <div className="pt-4 pr-4 pb-6 pl-4 sm:pl-6 max-sm:px-3">
         {guide && (
-          <GuideBand step={3} title={w.guideStep3Title} onSkip={flow.skipGuide}>
+          <GuideBand step={3} title={w.guideStep3Title} onSkip={() => flow.skipGuide(3)}>
             {w.guideStep3Text}
           </GuideBand>
         )}

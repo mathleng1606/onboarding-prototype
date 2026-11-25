@@ -60,7 +60,7 @@ function useItemAction() {
   const navigate = useNavigate();
   const toast = useToast();
   return (key: ChecklistItemKey) => {
-    if (key === 'test_recommendation' || key === 'real_recommendation') flow.startReco();
+    if (key === 'test_recommendation' || key === 'real_recommendation') flow.startReco('checklist');
     // Item 3 opens the catalogue outside the guide (screen 9), where « Configurer mes favoris » lives.
     else if (key === 'favorites') navigate('/catalogue');
     else if (key === 'real_patient') navigate('/patients/nouveau');

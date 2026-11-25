@@ -117,7 +117,7 @@ export function CataloguePage() {
         guide={guide}
         onValidate={validate}
         onChoosePatient={() => setParam({ panel: 'patient' })}
-        onSkipGuide={flow.skipGuide}
+        onSkipGuide={() => flow.skipGuide(2)}
       />
       <CatalogueToolbar q={q} onSearch={setQ} />
 
@@ -179,7 +179,7 @@ export function CataloguePage() {
           initialTab={panel === 'create' ? 'create' : 'search'}
           onClose={() => setParam({ panel: null })}
           onChoose={choosePatient}
-          onSkipGuide={flow.skipGuide}
+          onSkipGuide={() => flow.skipGuide(1)}
         />
       )}
     </div>

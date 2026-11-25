@@ -57,7 +57,7 @@ export const api = {
   completeSignup: () => request<Practitioner>('POST', `${P}/signup/complete`),
 
   onboarding: () => request<Onboarding>('GET', `${P}/onboarding`),
-  skipGuide: () => request<Onboarding>('POST', `${P}/onboarding/skip-guide`),
+  skipGuide: (step: 1 | 2 | 3) => request<Onboarding>('POST', `${P}/onboarding/skip-guide`, { step }),
   dismissWelcome: () => request<Onboarding>('POST', `${P}/onboarding/dismiss-welcome`),
   dismissChecklist: () => request<Onboarding>('POST', `${P}/onboarding/dismiss-checklist`),
 
@@ -81,8 +81,8 @@ export const api = {
   updateRecommendation: (uid: string, patch: { note?: string; items?: ItemInput[]; patientUid?: string }) =>
     request<Recommendation>('PATCH', `${P}/recommendations/${uid}`, patch),
   deleteRecommendation: (uid: string) => request<void>('DELETE', `${P}/recommendations/${uid}`),
-  sendRecommendation: (uid: string) =>
-    request<{ recommendation: Recommendation; onboarding: Onboarding }>('POST', `${P}/recommendations/${uid}/send`),
+  sendRecommendation: (uid: string, source: 'guide' | 'accueil' | 'checklist' | 'patients') =>
+    request<{ recommendation: Recommendation; onboarding: Onboarding }>('POST', `${P}/recommendations/${uid}/send`, { source }),
 
   events: (limit = 200) => request<AppEvent[]>('GET', `${P}/events?limit=${limit}`),
   track: (name: string, props: Record<string, unknown>) => request<AppEvent>('POST', `${P}/events`, { name, props }),

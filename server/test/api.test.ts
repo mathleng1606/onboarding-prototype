@@ -33,7 +33,7 @@ async function signup() {
 async function sendRecoTo(patientUid: string) {
   const created = await call('POST', `${P}/recommendations`, { patientUid, items: [{ productUid: OMEGA }] });
   assert.equal(created.status, 201);
-  return call('POST', `${P}/recommendations/${created.body.uid}/send`);
+  return call('POST', `${P}/recommendations/${created.body.uid}/send`, { source: 'accueil' });
 }
 
 async function createRealPatient() {
@@ -120,14 +120,14 @@ describe('checklist', () => {
 
   test('skipping the guide ends the guide without ticking item 2', async () => {
     await signup();
-    const o = (await call('POST', `${P}/onboarding/skip-guide`)).body;
+    const o = (await call('POST', `${P}/onboarding/skip-guide`, { step: 1 })).body;
     assert.equal(o.guideActive, false);
     assert.equal(done(o).test_recommendation, false);
   });
 
   test('a first REAL reco ticks items 2, 4 and 5 and closes the checklist', async () => {
     await signup();
-    await call('POST', `${P}/onboarding/skip-guide`);
+    await call('POST', `${P}/onboarding/skip-guide`, { step: 1 });
     const { body } = await sendRecoTo(await createRealPatient());
     assert.equal(body.recommendation.isTest, false);
     assert.deepEqual(done(body.onboarding), {
@@ -244,7 +244,7 @@ describe('recommendations', () => {
     await signup();
     const reco = (await sendRecoTo(TEST_PATIENT_UID)).body.recommendation;
     assert.equal((await call('PATCH', `${P}/recommendations/${reco.uid}`, { note: 'x' })).status, 409);
-    assert.equal((await call('POST', `${P}/recommendations/${reco.uid}/send`)).status, 409);
+    assert.equal((await call('POST', `${P}/recommendations/${reco.uid}/send`, { source: 'accueil' })).status, 409);
     await call('PATCH', P, { patientDiscountPct: 20 });
     assert.equal((await call('GET', `${P}/recommendations/${reco.uid}`)).body.totals.discountPct, 10);
   });
@@ -255,19 +255,50 @@ describe('recommendations', () => {
   });
 });
 
-describe('events', () => {
-  test('web events are stored, server events are added on facts', async () => {
-    assert.equal((await call('POST', `${P}/events`, { name: 'guide_started', props: { from: 'welcome_modal' } })).status, 201);
-    assert.equal((await call('POST', `${P}/events`, { name: 'Bad Name' })).status, 422);
+type Ev = { name: string; source: string; props: Record<string, unknown> };
+const serverEvents = async () =>
+  ((await call('GET', `${P}/events`)).body as Ev[]).filter((e) => e.source === 'server').reverse();
+
+describe('server events (aligned names)', () => {
+  test('signup + test reco: checklist_item_completed and reco_sent, no guide event', async () => {
     await signup();
     await sendRecoTo(TEST_PATIENT_UID);
-    const names = (await call('GET', `${P}/events`)).body.map((e: { name: string; source: string }) => `${e.source}:${e.name}`);
-    assert.deepEqual(names.reverse(), [
-      'web:guide_started',
-      'server:onboarding_item_completed',
-      'server:recommendation_sent',
-      'server:onboarding_item_completed',
-      'server:guide_ended',
-    ]);
+    assert.deepEqual(
+      (await serverEvents()).map((e) => [e.name, e.props]),
+      [
+        ['checklist_item_completed', { item: 'account' }],
+        ['reco_sent', { is_test_patient: true, source: 'accueil', n_products: 1 }],
+        ['checklist_item_completed', { item: 'test_recommendation' }],
+      ],
+    );
+  });
+
+  test('« Passer le guide » records guide_dismissed with the step, only while the guide is active', async () => {
+    await signup();
+    await call('POST', `${P}/onboarding/skip-guide`, { step: 2 });
+    await call('POST', `${P}/onboarding/skip-guide`, { step: 3 }); // already skipped: nothing more
+    const dismissed = (await serverEvents()).filter((e) => e.name === 'guide_dismissed');
+    assert.deepEqual(dismissed.map((e) => e.props), [{ step: 2 }]);
+    assert.equal((await call('POST', `${P}/onboarding/skip-guide`, {})).status, 422);
+  });
+
+  test('the first real reco records checklist_closed with the number of items done', async () => {
+    await signup();
+    await sendRecoTo(await createRealPatient());
+    const closed = (await serverEvents()).filter((e) => e.name === 'checklist_closed');
+    assert.deepEqual(closed.map((e) => e.props), [{ n_items_done: 4 }]);
+  });
+
+  test('old names are gone', async () => {
+    await signup();
+    await call('POST', `${P}/onboarding/skip-guide`, { step: 1 });
+    await sendRecoTo(await createRealPatient());
+    const names = new Set((await serverEvents()).map((e) => e.name));
+    for (const old of ['onboarding_item_completed', 'guide_ended', 'recommendation_sent']) assert.equal(names.has(old), false);
+  });
+
+  test('sending needs a known source', async () => {
+    const created = await call('POST', `${P}/recommendations`, { patientUid: TEST_PATIENT_UID, items: [{ productUid: OMEGA }] });
+    assert.equal((await call('POST', `${P}/recommendations/${created.body.uid}/send`, { source: 'ailleurs' })).status, 422);
   });
 });

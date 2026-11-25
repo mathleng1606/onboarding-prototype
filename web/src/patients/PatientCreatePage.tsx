@@ -29,7 +29,7 @@ export function PatientCreatePage() {
       </div>
       <div className="max-w-[590px] mx-auto px-4 pt-8 pb-12">
         {created ? (
-          <PatientCreated patient={created} onChoose={() => flow.startReco(created.uid)} onLater={() => navigate('/patients')} />
+          <PatientCreated patient={created} onChoose={() => flow.startReco('patients', created.uid)} onLater={() => navigate('/patients')} />
         ) : (
           <>
             <h1 className="mt-0 mb-6 text-2xl font-medium text-ink">Créez un nouveau {w.n}</h1>

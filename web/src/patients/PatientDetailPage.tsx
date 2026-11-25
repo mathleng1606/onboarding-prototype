@@ -177,7 +177,7 @@ export function PatientDetailPage() {
         <span className="text-base text-ink-muted">Commandes</span>
       </div>
       <div className="flex justify-end mt-4">
-        <Button onClick={() => flow.startReco(p.uid)} className="max-sm:h-7 max-sm:text-13">{w.newRecoTitle}</Button>
+        <Button onClick={() => flow.startReco('patients', p.uid)} className="max-sm:h-7 max-sm:text-13">{w.newRecoTitle}</Button>
       </div>
       <section className="flex max-sm:hidden mt-4 bg-surface-card border border-border rounded-lg text-sm font-medium text-ink">
         <span className="flex-[1.3] p-4 text-center">Date de création</span>
