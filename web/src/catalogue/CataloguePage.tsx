@@ -35,7 +35,9 @@ export function CataloguePage() {
   const patientUid = params.get('patient');
   const recoUid = params.get('reco');
   const patient = patients?.find((p) => p.uid === patientUid) ?? null;
-  const guide = onboarding?.guideActive ?? false;
+  // The guide is about the test patient only: a recommendation for a real patient is in normal mode,
+  // even when the guide is still active (real patient created from the Patients page).
+  const guide = (onboarding?.guideActive ?? false) && (!patient || patient.isTest);
 
   const [selection, setSelection] = useState<Selection>(new Map());
   const [q, setQ] = useState('');

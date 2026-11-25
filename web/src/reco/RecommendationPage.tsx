@@ -45,7 +45,8 @@ function Editor({ initial, practitioner, guideActive }: { initial: Recommendatio
   const [preview, setPreview] = useState(false);
   const [sent, setSent] = useState<Recommendation | null>(null);
   // The guide band stays under the confirmation modal, as in the reference.
-  const [guide] = useState(guideActive);
+  // Only for the test patient: a recommendation for a real patient is in normal mode (see CataloguePage).
+  const [guide] = useState(guideActive && initial.patient.isTest);
   useTrackView(guide, 'guide_step_viewed', { step: 3 });
   const saveTimer = useRef<number | undefined>(undefined);
   const patient = reco.patient;
