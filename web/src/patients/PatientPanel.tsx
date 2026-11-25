@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Patient } from '../api/types';
 import { usePatients } from '../hooks/queries';
 import { initials } from '../lib/format';
+import { track, useTrackView } from '../lib/track';
 import { useWording } from '../lib/wording';
 import { Avatar, CloseButton, GuideBand, SidePanel, TestBadge } from '../ui';
 import { buttonClass } from '../ui/buttons';
@@ -32,6 +33,7 @@ export function PatientPanel({
 }) {
   const w = useWording();
   const [tab, setTab] = useState<Tab>(guide ? 'search' : initialTab);
+  useTrackView(guide, 'guide_step_viewed', { step: 1 });
 
   return (
     <SidePanel label={`Sélectionner un ${w.n}`} onClose={onClose}>
@@ -71,7 +73,12 @@ export function PatientPanel({
         {tab === 'search' ? (
           <PatientSearch guide={guide} onChoose={onChoose} onCreate={() => setTab('create')} />
         ) : (
-          <CreatePatientForm onCreated={onChoose} />
+          <CreatePatientForm
+            onCreated={(p) => {
+              track('patient_created', { source: 'flux_reco' });
+              onChoose(p);
+            }}
+          />
         )}
       </div>
     </SidePanel>

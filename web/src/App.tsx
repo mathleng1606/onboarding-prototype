@@ -13,6 +13,8 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import { CataloguePage } from './catalogue/CataloguePage';
 import { FavoritesPage } from './favorites/FavoritesPage';
 import { usePractitioner } from './hooks/queries';
+import { trackOnce } from './lib/track';
+import { useEffect } from 'react';
 import { HomePage } from './home/HomePage';
 import { AppShell } from './layout/AppShell';
 import { WordingContext, wordingFor } from './lib/wording';
@@ -30,6 +32,11 @@ const queryClient = new QueryClient({
 /** The app is only reachable once the signup is completed (checklist item 1). */
 function RequireSignup() {
   const { data: p, isLoading, error } = usePractitioner();
+  const signedUp = !!p?.signupCompletedAt;
+  // session_started: once per browser session; the server adds days_since_signup.
+  useEffect(() => {
+    if (signedUp) trackOnce('session_started', sessionStorage, 'session_started', {});
+  }, [signedUp]);
   if (error) return <div className="p-6 text-sm">API injoignable. Lancez le serveur : npm run dev (à la racine).</div>;
   if (isLoading || !p) return null;
   if (!p.signupCompletedAt) return <Navigate to="/inscription/infos" replace />;

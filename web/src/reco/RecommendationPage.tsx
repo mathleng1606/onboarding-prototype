@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import type { ItemInput, Practitioner, Recommendation } from '../api/types';
 import { keys, useOnboarding, usePractitioner, useRefresh } from '../hooks/queries';
 import { currentRecoSource, useFlow } from '../lib/flow';
+import { track, useTrackView } from '../lib/track';
 import { useWording } from '../lib/wording';
 import { GuideBand } from '../ui';
 import { useToast } from '../ui/toast';
@@ -45,6 +46,7 @@ function Editor({ initial, practitioner, guideActive }: { initial: Recommendatio
   const [sent, setSent] = useState<Recommendation | null>(null);
   // The guide band stays under the confirmation modal, as in the reference.
   const [guide] = useState(guideActive);
+  useTrackView(guide, 'guide_step_viewed', { step: 3 });
   const saveTimer = useRef<number | undefined>(undefined);
   const patient = reco.patient;
 
@@ -74,6 +76,8 @@ function Editor({ initial, practitioner, guideActive }: { initial: Recommendatio
     await saveNote();
     const res = await api.sendRecommendation(reco.uid, currentRecoSource());
     refresh.onboarding(res.onboarding);
+    // reco_sent itself is written by the server.
+    if (guide) track('guide_step_completed', { step: 3 });
     await qc.invalidateQueries({ queryKey: ['recommendations'] });
     await qc.invalidateQueries({ queryKey: keys.patients });
     setPreview(false);

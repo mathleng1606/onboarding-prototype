@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useRefresh } from '../hooks/queries';
+import { track } from './track';
 
 /** Where a recommendation was started from (reco_started, reco_sent). Same list as the server. */
 export type RecoSource = 'guide' | 'accueil' | 'checklist' | 'patients';
@@ -24,6 +25,7 @@ export function useFlow() {
     /** « Créer une recommandation », « Commencer », « Nouvelle recommandation »… */
     startReco: (source: RecoSource, patientUid?: string) => {
       sessionStorage.setItem(RECO_SOURCE_KEY, source);
+      track('reco_started', { source });
       navigate(patientUid ? `/catalogue?patient=${patientUid}` : '/catalogue?panel=patient');
     },
     /** « Passer le guide »: closes the guide for good and goes back to the home page. */

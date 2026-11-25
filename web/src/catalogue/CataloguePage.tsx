@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import type { Patient, Product } from '../api/types';
 import { keys, useOnboarding, usePatients, usePractitioner } from '../hooks/queries';
 import { useFlow } from '../lib/flow';
+import { track, useTrackView } from '../lib/track';
 import { PROFESSION_PLURALS, useWording } from '../lib/wording';
 import { PatientPanel } from '../patients/PatientPanel';
 import { Upload } from '../ui/icons';
@@ -68,6 +69,9 @@ export function CataloguePage() {
     return all.data.filter((p) => n(`${p.name} ${p.brand}`).includes(n(q)));
   }, [q, all.data]);
 
+  // Guide step 2 = choosing the products, once the test patient is chosen (the band shows then).
+  useTrackView(guide && !!patient, 'guide_step_viewed', { step: 2 });
+
   if (!onboarding || !practitioner) return null;
 
   const setParam = (changes: Record<string, string | null>) => {
@@ -79,7 +83,11 @@ export function CataloguePage() {
     setParams(next);
   };
 
-  const choosePatient = (p: Patient) => setParam({ patient: p.uid, panel: null });
+  const choosePatient = (p: Patient) => {
+    // Guide step 1 = choosing the test patient (the only one offered during the guide).
+    if (guide) track('guide_step_completed', { step: 1 });
+    setParam({ patient: p.uid, panel: null });
+  };
   const add = (product: Product, quantity: number) => setSelection(new Map(selection).set(product.uid, quantity));
   const remove = (product: Product) => {
     const next = new Map(selection);
@@ -101,6 +109,7 @@ export function CataloguePage() {
         recoUid && draft?.status === 'draft'
           ? await api.updateRecommendation(recoUid, { patientUid: patient.uid, items })
           : await api.createRecommendation({ patientUid: patient.uid, items, note: w.defaultNote(patient.firstName) });
+      if (guide) track('guide_step_completed', { step: 2 });
       navigate(`/recommandations/${reco.uid}`);
     } finally {
       setBusy(false);

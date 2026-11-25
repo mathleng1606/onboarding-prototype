@@ -54,7 +54,8 @@ const qs = (params: Record<string, string | undefined>) => {
 export const api = {
   practitioner: () => request<Practitioner>('GET', P),
   updatePractitioner: (patch: Partial<Practitioner>) => request<Practitioner>('PATCH', P, patch),
-  completeSignup: () => request<Practitioner>('POST', `${P}/signup/complete`),
+  completeSignup: (anonymousId?: string) =>
+    request<Practitioner>('POST', `${P}/signup/complete`, anonymousId ? { anonymousId } : undefined),
 
   onboarding: () => request<Onboarding>('GET', `${P}/onboarding`),
   skipGuide: (step: 1 | 2 | 3) => request<Onboarding>('POST', `${P}/onboarding/skip-guide`, { step }),
@@ -85,6 +86,7 @@ export const api = {
     request<{ recommendation: Recommendation; onboarding: Onboarding }>('POST', `${P}/recommendations/${uid}/send`, { source }),
 
   events: (limit = 200) => request<AppEvent[]>('GET', `${P}/events?limit=${limit}`),
-  track: (name: string, props: Record<string, unknown>) => request<AppEvent>('POST', `${P}/events`, { name, props }),
+  track: (name: string, props: Record<string, unknown>, anonymousId?: string) =>
+    request<AppEvent>('POST', `${P}/events`, { name, props, ...(anonymousId ? { anonymousId } : {}) }),
   reset: () => request<void>('POST', '/dev/reset'),
 };

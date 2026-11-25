@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { keys, useCategories } from '../hooks/queries';
 import { pagePadding } from '../layout/AppShell';
+import { track } from '../lib/track';
 import { ProductImage, Price } from '../catalogue/ProductCard';
 import { Button } from '../ui';
 import { cx } from '../ui/utils';
@@ -67,7 +68,14 @@ export function FavoritesPage() {
             <span className="text-sm font-medium text-ink">
               {favoritesCount} favori{favoritesCount > 1 ? 's' : ''}
             </span>
-            <Button onClick={() => navigate('/catalogue')}>Terminer</Button>
+            <Button
+              onClick={() => {
+                track('favorites_configured', { n_products: favoritesCount });
+                navigate('/catalogue');
+              }}
+            >
+              Terminer
+            </Button>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
             {visible.map((p) => (

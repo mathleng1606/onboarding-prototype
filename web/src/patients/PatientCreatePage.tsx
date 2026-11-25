@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { Patient } from '../api/types';
 import { useFlow } from '../lib/flow';
+import { type PatientSource, track } from '../lib/track';
 import { useWording } from '../lib/wording';
 import { Button } from '../ui';
 import { ArrowLeft } from '../ui/icons';
@@ -18,6 +19,8 @@ export function PatientCreatePage() {
   const navigate = useNavigate();
   const flow = useFlow();
   const [created, setCreated] = useState<Patient | null>(null);
+  // Item 4 of the checklist says where it comes from (router state); otherwise it is the Patients page.
+  const source: PatientSource = (useLocation().state as { source?: PatientSource } | null)?.source ?? 'page_patients';
   return (
     <>
       {/* z 5: above the scrolling form, below the « Réduire le menu » button (z 10). */}
@@ -33,7 +36,12 @@ export function PatientCreatePage() {
         ) : (
           <>
             <h1 className="mt-0 mb-6 text-2xl font-medium text-ink">Créez un nouveau {w.n}</h1>
-            <CreatePatientForm onCreated={setCreated} />
+            <CreatePatientForm
+              onCreated={(p) => {
+                track('patient_created', { source });
+                setCreated(p);
+              }}
+            />
           </>
         )}
       </div>

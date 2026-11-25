@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Practitioner, Profession, RecoFrequency } from '../api/types';
 import { keys, usePractitioner, useRefresh } from '../hooks/queries';
+import { ensureAnonymousId, forgetAnonymousId, track, trackOnce } from '../lib/track';
 import { WordingContext, wordingFor } from '../lib/wording';
 import { Button } from '../ui';
 import { ChevronDown, ChevronLeft } from '../ui/icons';
@@ -37,6 +38,18 @@ function Signup({ step, practitioner }: { step: Step; practitioner: Practitioner
   const [frequency, setFrequency] = useState<RecoFrequency | null>(practitioner.recoFrequency);
   const [busy, setBusy] = useState(false);
 
+  // No account yet: the events of the signup carry this browser's anonymous id.
+  useEffect(() => {
+    ensureAnonymousId();
+  }, []);
+  /** signup_started: at the first field filled, once for this anonymous id. */
+  const edit =
+    <T,>(set: (v: T) => void) =>
+    (v: T) => {
+      trackOnce(`signup_started:${ensureAnonymousId()}`, localStorage, 'signup_started', {});
+      set(v);
+    };
+
   const infosOk = !!(firstName.trim() && lastName.trim() && phone.replace(/\s/g, '').length > 3);
   const ok = step === 'infos' ? infosOk : step === 'profession' ? !!profession : !!frequency;
 
@@ -47,13 +60,18 @@ function Signup({ step, practitioner }: { step: Step; practitioner: Practitioner
     try {
       if (step === 'infos') {
         await api.updatePractitioner({ firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() });
+        track('signup_step_completed', { step: 1 });
         navigate('/inscription/profession');
       } else if (step === 'profession') {
         await api.updatePractitioner({ profession: profession! });
+        track('signup_step_completed', { step: 2 });
         navigate('/inscription/pratique');
       } else {
         await api.updatePractitioner({ recoFrequency: frequency! });
-        await api.completeSignup();
+        track('signup_step_completed', { step: 3, volume_declared: frequency! });
+        // signup_completed is written by the server, which links this anonymous id to the account.
+        await api.completeSignup(ensureAnonymousId());
+        forgetAnonymousId();
         await refresh.onboarding();
         await qc.invalidateQueries({ queryKey: keys.practitioner });
         navigate('/', { replace: true });
@@ -104,10 +122,10 @@ function Signup({ step, practitioner }: { step: Step; practitioner: Practitioner
             )}
             <Stepper step={step} />
             {step === 'infos' && (
-              <InfosStep {...{ firstName, setFirstName, lastName, setLastName, phone, setPhone }} />
+              <InfosStep setFirstName={edit(setFirstName)} setLastName={edit(setLastName)} setPhone={edit(setPhone)} {...{ firstName, lastName, phone }} />
             )}
-            {step === 'profession' && <ProfessionStep value={profession} onChange={setProfession} />}
-            {step === 'pratique' && <PracticeStep value={frequency} onChange={setFrequency} />}
+            {step === 'profession' && <ProfessionStep value={profession} onChange={edit(setProfession)} />}
+            {step === 'pratique' && <PracticeStep value={frequency} onChange={edit(setFrequency)} />}
 
             <div className={step === 'infos' ? 'mt-3' : step === 'pratique' ? 'mt-4' : 'mt-3'}>
               {/* 35 px high as in the reference signup (the « ! » forces it over the standard heights). */}

@@ -6,6 +6,7 @@ import type { PatientListItem } from '../api/types';
 import { keys, usePatients } from '../hooks/queries';
 import { pagePadding } from '../layout/AppShell';
 import { useFlow } from '../lib/flow';
+import { useTrackView } from '../lib/track';
 import { numericDate } from '../lib/format';
 import { useWording } from '../lib/wording';
 import { Button, TestBadge } from '../ui';
@@ -27,7 +28,8 @@ export function PatientsListPage() {
   const navigate = useNavigate();
   const flow = useFlow();
   const qc = useQueryClient();
-  const { data: patients = [] } = usePatients();
+  const { data: patients = [], isSuccess } = usePatients();
+  useTrackView(isSuccess, 'patient_list_viewed', { n_patients_shown: patients.length });
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean } | null>(null);
 

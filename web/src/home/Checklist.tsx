@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import type { ChecklistItemKey, Onboarding } from '../api/types';
 import { useRefresh } from '../hooks/queries';
 import { useFlow } from '../lib/flow';
+import { track, trackOnce } from '../lib/track';
 import { useWording } from '../lib/wording';
 import { SrOnly } from '../ui';
 import { buttonClass } from '../ui/buttons';
@@ -54,16 +55,30 @@ export function FirstSteps({ onboarding, theme }: { onboarding: Onboarding; them
 /** The checklist « X » collapses it until the end of this browser session. */
 const COLLAPSED_KEY = 'checklist-collapsed';
 
+/** checklist_item_viewed: each item still to do that is shown, once per browser session. */
+function useItemsViewed(keys: ChecklistItemKey[]) {
+  const shown = keys.join(',');
+  useEffect(() => {
+    for (const item of shown ? (shown.split(',') as ChecklistItemKey[]) : []) {
+      trackOnce(`checklist_item_viewed:${item}`, sessionStorage, 'checklist_item_viewed', { item });
+    }
+  }, [shown]);
+}
+
 /** What each checklist item opens. */
 function useItemAction() {
   const flow = useFlow();
   const navigate = useNavigate();
   const toast = useToast();
   return (key: ChecklistItemKey) => {
-    if (key === 'test_recommendation' || key === 'real_recommendation') flow.startReco('checklist');
+    track('checklist_item_clicked', { item: key });
+    if (key === 'test_recommendation' || key === 'real_recommendation') {
+      track('reco_cta_clicked', { location: 'checklist' });
+      flow.startReco('checklist');
+    }
     // Item 3 opens the catalogue outside the guide (screen 9), where « Configurer mes favoris » lives.
     else if (key === 'favorites') navigate('/catalogue');
-    else if (key === 'real_patient') navigate('/patients/nouveau');
+    else if (key === 'real_patient') navigate('/patients/nouveau', { state: { source: 'checklist' } });
     else toast(NOT_IN_PROTOTYPE);
   };
 }
@@ -107,6 +122,7 @@ function Checklist({
 }) {
   const w = useWording();
   const act = useItemAction();
+  useItemsViewed(onboarding.items.filter((i) => !i.done).map((i) => i.key));
   const title: Record<ChecklistItemKey, string> = {
     account: 'Créer votre compte',
     test_recommendation: w.checklistItem2Title,
@@ -206,6 +222,7 @@ function ChecklistDone({ onboarding, t }: { onboarding: Onboarding; t: Checklist
   const refresh = useRefresh();
   const act = useItemAction();
   const favoritesDone = onboarding.items.find((i) => i.key === 'favorites')!.done;
+  useItemsViewed(favoritesDone ? [] : ['favorites']);
   return (
     <section aria-label="Vos premiers pas" className={cx('flex flex-wrap items-center gap-3 py-3 px-4 min-h-12 box-border rounded-lg', t.card)}>
       <StatusDot done t={t} />
@@ -213,7 +230,13 @@ function ChecklistDone({ onboarding, t }: { onboarding: Onboarding; t: Checklist
         <span className="font-medium">{w.checklistDoneLead}</span>
         {w.checklistDoneRest}
       </span>
-      <CloseCard t={t} onClick={async () => refresh.onboarding(await api.dismissChecklist())} />
+      <CloseCard
+        t={t}
+        onClick={async () => {
+          track('checklist_dismissed', { n_items_done: onboarding.doneCount });
+          refresh.onboarding(await api.dismissChecklist());
+        }}
+      />
       {!favoritesDone && (
         <button
           type="button"
