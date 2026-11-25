@@ -117,3 +117,8 @@ export type AppEvent = {
   /** Set by the server. */
   createdAt: string;
 };
+
+/** GET /dev/durations: computed from the events when read (server/src/services/durations.ts). */
+export type DurationSample = { who: string; startedAt: string; endedAt: string; seconds: number };
+export type DurationMeasure = { samples: DurationSample[]; medianSeconds: number | null };
+export type Durations = { signup: DurationMeasure; tutorial: DurationMeasure; reco: DurationMeasure };

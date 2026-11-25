@@ -1,6 +1,7 @@
 import type {
   AppEvent,
   Category,
+  Durations,
   ItemInput,
   Onboarding,
   Patient,
@@ -89,4 +90,8 @@ export const api = {
   track: (name: string, props: Record<string, unknown>, anonymousId?: string) =>
     request<AppEvent>('POST', `${P}/events`, { name, props, ...(anonymousId ? { anonymousId } : {}) }),
   reset: () => request<void>('POST', '/dev/reset'),
+  /** /debug page (dev routes): every event, the durations, and emptying the events. */
+  devEvents: (limit = 300) => request<AppEvent[]>('GET', `/dev/events?limit=${limit}`),
+  devDurations: () => request<Durations>('GET', '/dev/durations'),
+  clearEvents: () => request<void>('DELETE', '/dev/events'),
 };

@@ -1,5 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import { resetDatabase } from '../db/seed.ts';
+import { parse } from '../lib.ts';
+import { allEventRows, computeDurations } from '../services/durations.ts';
+import { toEventDto } from '../services/events.ts';
 import { CATEGORIES } from '../services/products.ts';
 import { findPractitioner, type PractitionerRow } from '../services/practitioners.ts';
 import { param, type RouteOptions } from './context.ts';
@@ -34,6 +38,15 @@ export const apiRoutes: FastifyPluginAsync<RouteOptions & { devRoutes: boolean }
   if (devRoutes) {
     app.post('/dev/reset', async (_req, reply) => {
       resetDatabase(db);
+      return reply.code(204).send();
+    });
+
+    // The /debug page: every event (all accounts and anonymous visitors), the durations, and a reset.
+    const limitSchema = z.object({ limit: z.coerce.number().int().min(1).max(1000).default(300) });
+    app.get('/dev/events', async (req) => allEventRows(db, parse(limitSchema, req.query).limit).map(toEventDto));
+    app.get('/dev/durations', async () => computeDurations(allEventRows(db)));
+    app.delete('/dev/events', async (_req, reply) => {
+      db.prepare(`DELETE FROM events`).run();
       return reply.code(204).send();
     });
   }

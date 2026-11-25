@@ -7,10 +7,12 @@
  * /recommandations/:uid     recommendation editor (screens 3, 6)
  * /patients, /patients/nouveau, /patients/:uid   patients (screens 7, 10)
  * /favoris                  favorites setup (screen 8)
+ * /debug                    events and durations (not in the menu, dev only)
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { CataloguePage } from './catalogue/CataloguePage';
+import { DebugPage } from './debug/DebugPage';
 import { FavoritesPage } from './favorites/FavoritesPage';
 import { usePractitioner } from './hooks/queries';
 import { trackOnce } from './lib/track';
@@ -55,6 +57,7 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/inscription/:step?" element={<SignupPage />} />
+              <Route path="/debug" element={<DebugPage />} />
               <Route element={<RequireSignup />}>
                 <Route element={<AppShell />}>
                   <Route index element={<HomePage />} />
