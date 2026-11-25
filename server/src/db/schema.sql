@@ -109,15 +109,22 @@ CREATE TABLE IF NOT EXISTS favorites (
   PRIMARY KEY (practitioner_id, product_id)
 );
 
+-- Product analytics. Before the signup is completed the visitor has no account yet: events carry the
+-- anonymous_id kept by the browser; signup_completed links it to the account (account_uid).
+-- created_at is always set here, by the server, never by the browser. No duration is stored:
+-- durations are computed when read (see services/durations.ts).
 CREATE TABLE IF NOT EXISTS events (
-  id              INTEGER PRIMARY KEY,
-  practitioner_id INTEGER REFERENCES practitioners(id),
-  name            TEXT NOT NULL,
-  props           TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(props)),  -- JSON, uids only
-  source          TEXT NOT NULL DEFAULT 'web' CHECK (source IN ('web','server')),
-  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now'))
+  id           INTEGER PRIMARY KEY,
+  name         TEXT NOT NULL,
+  anonymous_id TEXT,
+  account_uid  TEXT REFERENCES practitioners(uid),
+  props        TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(props)),  -- JSON, never patient data
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now')),
+  CHECK (anonymous_id IS NOT NULL OR account_uid IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS events_created ON events(created_at DESC);
+CREATE INDEX IF NOT EXISTS events_account ON events(account_uid);
+CREATE INDEX IF NOT EXISTS events_anonymous ON events(anonymous_id);
 
 -- updated_at maintained by the database, not by each query.
 CREATE TRIGGER IF NOT EXISTS practitioners_updated_at AFTER UPDATE ON practitioners

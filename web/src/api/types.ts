@@ -109,8 +109,11 @@ export type Recommendation = {
 export type ItemInput = { productUid: string; quantity: number; dosage?: string };
 
 export type AppEvent = {
+  id: number;
   name: string;
+  anonymousId: string | null;
+  accountUid: string | null;
   props: Record<string, unknown>;
-  source: 'web' | 'server';
+  /** Set by the server. */
   createdAt: string;
 };

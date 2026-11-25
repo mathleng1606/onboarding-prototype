@@ -66,13 +66,15 @@ export function withOnboardingTracking<T>(db: DB, p: PractitionerRow, mutate: ()
   return result;
 }
 
+const SERVER = { origin: 'server' } as const;
+
 function recordOnboardingChanges(db: DB, p: PractitionerRow, before: Onboarding, after: Onboarding) {
   for (const item of after.items) {
     const was = before.items.find((i) => i.key === item.key)!;
-    if (item.done && !was.done) recordEvent(db, p.id, 'checklist_item_completed', { item: item.key }, 'server');
+    if (item.done && !was.done) recordEvent(db, p, 'checklist_item_completed', { item: item.key }, SERVER);
   }
   if (after.closed && !before.closed) {
-    recordEvent(db, p.id, 'checklist_closed', { n_items_done: after.doneCount }, 'server');
+    recordEvent(db, p, 'checklist_closed', { n_items_done: after.doneCount }, SERVER);
   }
   // The end of the guide is not an event of its own: a completed guide reads as the test reco_sent,
   // a skipped one is recorded by the skip-guide route as guide_dismissed (it knows the step).

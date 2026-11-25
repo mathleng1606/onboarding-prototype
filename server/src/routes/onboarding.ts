@@ -20,7 +20,7 @@ export const onboardingRoutes: FastifyPluginAsync<RouteOptions> = async (app, { 
     const p = req.practitioner;
     const wasActive = computeOnboarding(db, p).guideActive;
     withOnboardingTracking(db, p, () => stamp(db, p, 'guide_skipped_at'));
-    if (wasActive) recordEvent(db, p.id, 'guide_dismissed', { step }, 'server');
+    if (wasActive) recordEvent(db, p, 'guide_dismissed', { step }, { origin: 'server' });
     return current(p);
   });
 

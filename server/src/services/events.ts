@@ -1,46 +1,71 @@
 import { z } from 'zod';
 import type { DB } from '../db/index.ts';
 import { iso } from '../lib.ts';
+import type { PractitionerRow } from './practitioners.ts';
 
 /** Where a recommendation was started from (reco_started, reco_sent). */
 export const RECO_SOURCES = ['guide', 'accueil', 'checklist', 'patients'] as const;
 
 export const eventSchema = z.strictObject({
   name: z.string().regex(/^[a-z][a-z0-9_]*$/, 'snake_case expected').max(64),
+  anonymousId: z.uuid().optional(),
   props: z.record(z.string(), z.unknown()).default({}),
 });
 
+/**
+ * Writes one event. The server decides who it belongs to and when:
+ * - account_uid once the signup is completed (or always for server events: the server knows the account);
+ * - anonymous_id as sent by the browser, until the signup is completed;
+ * - profession added to every event, read from the database;
+ * - created_at set by SQLite (`at` only exists so the tests can place events in time).
+ */
 export function recordEvent(
   db: DB,
-  practitionerId: number,
+  p: PractitionerRow,
   name: string,
   props: Record<string, unknown>,
-  source: 'web' | 'server',
+  opts: { origin: 'web' | 'server'; anonymousId?: string | null; at?: string },
 ) {
+  const accountUid = opts.origin === 'server' || p.signup_completed_at !== null ? p.uid : null;
   const row = db
     .prepare(
-      `INSERT INTO events (practitioner_id, name, props, source) VALUES (?, ?, ?, ?)
-       RETURNING name, props, source, created_at`,
+      `INSERT INTO events (name, anonymous_id, account_uid, props, created_at)
+       VALUES (@name, @anonymousId, @accountUid, @props, COALESCE(@at, strftime('%Y-%m-%d %H:%M:%f','now')))
+       RETURNING ${COLUMNS}`,
     )
-    .get(practitionerId, name, JSON.stringify(props), source) as EventRow;
+    .get({
+      name,
+      anonymousId: opts.anonymousId ?? null,
+      accountUid,
+      props: JSON.stringify({ ...props, profession: p.profession }),
+      at: opts.at ?? null,
+    }) as EventRow;
   return toEventDto(row);
 }
 
-type EventRow = { name: string; props: string; source: 'web' | 'server'; created_at: string };
+const COLUMNS = 'id, name, anonymous_id, account_uid, props, created_at';
+export type EventRow = {
+  id: number;
+  name: string;
+  anonymous_id: string | null;
+  account_uid: string | null;
+  props: string;
+  created_at: string;
+};
 
-export function listEvents(db: DB, practitionerId: number, limit: number) {
+/** The practitioner's events, plus the anonymous ones that were linked to the account at signup. */
+export function listEvents(db: DB, p: PractitionerRow, limit: number) {
   const rows = db
-    .prepare(
-      `SELECT name, props, source, created_at FROM events
-       WHERE practitioner_id = ? ORDER BY created_at DESC, id DESC LIMIT ?`,
-    )
-    .all(practitionerId, limit) as EventRow[];
+    .prepare(`SELECT ${COLUMNS} FROM events WHERE account_uid = ? ORDER BY created_at DESC, id DESC LIMIT ?`)
+    .all(p.uid, limit) as EventRow[];
   return rows.map(toEventDto);
 }
 
-const toEventDto = (r: EventRow) => ({
+export const toEventDto = (r: EventRow) => ({
+  id: r.id,
   name: r.name,
+  anonymousId: r.anonymous_id,
+  accountUid: r.account_uid,
   props: JSON.parse(r.props) as Record<string, unknown>,
-  source: r.source,
   createdAt: iso(r.created_at),
 });

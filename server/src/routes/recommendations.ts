@@ -48,7 +48,7 @@ export const recommendationRoutes: FastifyPluginAsync<RouteOptions> = async (app
     const p = req.practitioner;
     const recommendation = withOnboardingTracking(db, p, () => {
       const reco = sendReco(db, p, param(req, 'recoUid'));
-      recordEvent(db, p.id, 'reco_sent', { is_test_patient: reco.isTest, source, n_products: reco.items.length }, 'server');
+      recordEvent(db, p, 'reco_sent', { is_test_patient: reco.isTest, source, n_products: reco.items.length }, { origin: 'server' });
       return reco;
     });
     return { recommendation, onboarding: computeOnboarding(db, reloadPractitioner(db, p)) };

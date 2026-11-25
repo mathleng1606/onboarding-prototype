@@ -255,9 +255,30 @@ describe('recommendations', () => {
   });
 });
 
-type Ev = { name: string; source: string; props: Record<string, unknown> };
+type Ev = { name: string; props: Record<string, unknown> };
+const SERVER_EVENTS = new Set(['checklist_item_completed', 'checklist_closed', 'guide_dismissed', 'reco_sent']);
+/** Server events in chronological order, without the profession added to every event. */
 const serverEvents = async () =>
-  ((await call('GET', `${P}/events`)).body as Ev[]).filter((e) => e.source === 'server').reverse();
+  ((await call('GET', `${P}/events`)).body as Ev[])
+    .filter((e) => SERVER_EVENTS.has(e.name))
+    .map(({ name, props: { profession: _, ...props } }) => ({ name, props }))
+    .reverse();
+
+describe('events table', () => {
+  test('an old events table (practitioner_id, source) is replaced by the new one', () => {
+    const db = openDb(':memory:');
+    db.exec(`CREATE TABLE events (id INTEGER PRIMARY KEY, practitioner_id INTEGER, name TEXT, source TEXT)`);
+    applySchema(db);
+    const cols = (db.prepare(`SELECT name FROM pragma_table_info('events')`).all() as { name: string }[]).map((c) => c.name);
+    assert.deepEqual(cols, ['id', 'name', 'anonymous_id', 'account_uid', 'props', 'created_at']);
+  });
+
+  test('an event needs an anonymous_id or an account_uid', () => {
+    const db = openDb(':memory:');
+    applySchema(db);
+    assert.throws(() => db.prepare(`INSERT INTO events (name) VALUES ('signup_started')`).run(), /CHECK/);
+  });
+});
 
 describe('server events (aligned names)', () => {
   test('signup + test reco: checklist_item_completed and reco_sent, no guide event', async () => {
@@ -287,6 +308,14 @@ describe('server events (aligned names)', () => {
     await sendRecoTo(await createRealPatient());
     const closed = (await serverEvents()).filter((e) => e.name === 'checklist_closed');
     assert.deepEqual(closed.map((e) => e.props), [{ n_items_done: 4 }]);
+  });
+
+  test('every event carries the account and the profession, set by the server', async () => {
+    await signup();
+    const [e] = (await call('GET', `${P}/events`)).body;
+    assert.equal(e.accountUid, PRACTITIONER_UID);
+    assert.equal(e.props.profession, 'naturopath');
+    assert.match(e.createdAt, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
   });
 
   test('old names are gone', async () => {

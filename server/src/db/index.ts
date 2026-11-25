@@ -20,7 +20,17 @@ export function openDb(path = DB_PATH): DB {
 
 /** Creates missing tables, indexes and triggers. Safe to run on an existing database. */
 export function applySchema(db: DB): void {
+  migrateEvents(db);
   db.exec(readFileSync(SCHEMA_PATH, 'utf8'));
+}
+
+/**
+ * The first events table had practitioner_id + source instead of anonymous_id + account_uid.
+ * Its rows are fictitious analytics, so it is dropped and recreated rather than converted.
+ */
+function migrateEvents(db: DB): void {
+  const columns = db.prepare(`SELECT name FROM pragma_table_info('events')`).all() as { name: string }[];
+  if (columns.some((c) => c.name === 'practitioner_id')) db.exec(`DROP TABLE events`);
 }
 
 /** Drops every table and trigger, then recreates the schema (empty). */
