@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, test } from 'node:test';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.ts';
-import { applySchema, openDb } from '../src/db/index.ts';
+import { applySchema, type DB, openDb } from '../src/db/index.ts';
+import { computeDurations, type Durations } from '../src/services/durations.ts';
+import { type EventRow, recordEvent } from '../src/services/events.ts';
+import { findPractitioner } from '../src/services/practitioners.ts';
 import { PRACTITIONER_UID, seed, TEST_PATIENT_UID } from '../src/db/seed.ts';
 
 const P = `/api/practitioners/${PRACTITIONER_UID}`;
@@ -10,6 +13,7 @@ const OMEGA = '7d1b0f5a-2c3e-4f60-9a1b-000000000001';
 const MAGNESIUM = '7d1b0f5a-2c3e-4f60-9a1b-000000000002';
 
 let app: FastifyInstance;
+let db: DB;
 
 async function call(method: string, url: string, payload?: unknown) {
   const res = await app.inject({ method: method as 'GET', url, payload: payload as object });
@@ -43,7 +47,7 @@ async function createRealPatient() {
 }
 
 beforeEach(() => {
-  const db = openDb(':memory:');
+  db = openDb(':memory:');
   applySchema(db);
   seed(db);
   app = buildApp(db);
@@ -389,6 +393,82 @@ describe('POST /events', () => {
     }
     assert.equal((await call('POST', `${P}/events`, { name: 'session_started', createdAt: '2020-01-01' })).status, 422);
     assert.equal((await call('GET', `${P}/events`)).body.length, 0);
+  });
+});
+
+describe('durations (/debug)', () => {
+  /** Places an event at a given minute of 2026-01-01 (server clock), as the app would write it. */
+  const at = (min: number, sec = 0) => `2026-01-01 10:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}.000`;
+  const put = (name: string, props: Record<string, unknown>, when: string, anonymousId?: string) =>
+    recordEvent(db, findPractitioner(db, PRACTITIONER_UID), name, props, { origin: 'web', anonymousId, at: when });
+  const durations = async () => (await call('GET', '/api/dev/durations')).body as Durations;
+  const seconds = (m: Durations[keyof Durations]) => m.samples.map((s) => s.seconds);
+
+  test('signup = signup_completed − signup_started, paired by anonymous_id; an abandoned signup is not a duration', async () => {
+    const OTHER = '11111111-2222-4333-8444-555555555555';
+    put('signup_started', {}, at(0), ANON);
+    put('signup_started', {}, at(1), OTHER); // never completed
+    put('signup_step_completed', { step: 1 }, at(2), ANON);
+    put('signup_completed', {}, at(3, 30), ANON);
+    const d = await durations();
+    assert.deepEqual(seconds(d.signup), [210]);
+    assert.equal(d.signup.medianSeconds, 210);
+  });
+
+  test('tutorial = first test reco_sent − guide_step_viewed step 1; a real reco does not end it', async () => {
+    await signup();
+    put('guide_step_viewed', { step: 1 }, at(10));
+    put('guide_step_viewed', { step: 2 }, at(11));
+    put('reco_sent', { is_test_patient: false, source: 'accueil', n_products: 1 }, at(12));
+    put('reco_sent', { is_test_patient: true, source: 'guide', n_products: 2 }, at(14));
+    put('reco_sent', { is_test_patient: true, source: 'checklist', n_products: 1 }, at(20)); // not the first
+    assert.deepEqual(seconds((await durations()).tutorial), [240]);
+  });
+
+  test('no tutorial duration when the guide was skipped (no test reco_sent)', async () => {
+    await signup();
+    put('guide_step_viewed', { step: 1 }, at(10));
+    put('guide_dismissed', { step: 1 }, at(11));
+    assert.deepEqual((await durations()).tutorial, { samples: [], medianSeconds: null });
+  });
+
+  test('reco = reco_sent − the reco_started just before it, each start used once; median of the recos', async () => {
+    await signup();
+    put('reco_started', { source: 'accueil' }, at(0)); //    abandoned, replaced by the next start
+    put('reco_started', { source: 'accueil' }, at(10));
+    put('reco_sent', { is_test_patient: false, source: 'accueil', n_products: 1 }, at(12)); //  120 s
+    put('reco_started', { source: 'patients' }, at(20));
+    put('reco_sent', { is_test_patient: false, source: 'patients', n_products: 1 }, at(21)); // 60 s
+    put('reco_sent', { is_test_patient: false, source: 'patients', n_products: 1 }, at(22)); // no start left: ignored
+    put('reco_started', { source: 'checklist' }, at(30));
+    put('reco_sent', { is_test_patient: false, source: 'checklist', n_products: 1 }, at(35)); // 300 s
+    const d = await durations();
+    assert.deepEqual(seconds(d.reco), [120, 60, 300]);
+    assert.equal(d.reco.medianSeconds, 120);
+  });
+
+  test('pauses are kept: a 2-hour break counts as is', async () => {
+    await signup();
+    put('reco_started', { source: 'accueil' }, '2026-01-01 08:00:00.000');
+    put('reco_sent', { is_test_patient: false, source: 'accueil', n_products: 1 }, '2026-01-01 10:00:00.000');
+    assert.deepEqual(seconds((await durations()).reco), [7200]);
+  });
+
+  test('median of an even number of samples is the mean of the two middle ones', () => {
+    const row = (id: number, name: string, min: number): EventRow => ({
+      id, name, anonymous_id: null, account_uid: PRACTITIONER_UID, props: '{}', created_at: at(min),
+    });
+    const d = computeDurations([
+      row(1, 'reco_started', 0), row(2, 'reco_sent', 1),
+      row(3, 'reco_started', 2), row(4, 'reco_sent', 5),
+    ]);
+    assert.equal(d.reco.medianSeconds, 120);
+  });
+
+  test('« Vider les events » empties the table', async () => {
+    await signup();
+    assert.equal((await call('DELETE', '/api/dev/events')).status, 204);
+    assert.equal((await call('GET', '/api/dev/events')).body.length, 0);
   });
 });
 
