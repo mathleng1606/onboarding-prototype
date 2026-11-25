@@ -119,7 +119,7 @@ liste fermée (`server/src/services/eventCatalog.ts`), avec un schéma strict pa
 | `patient_created` | `source` : checklist, flux_reco, page_patients | front | `PatientPanel`, `PatientCreatePage` |
 | `patient_list_viewed` | `n_patients_shown` | front | `patients/PatientsListPage.tsx` |
 | `favorites_configured` | `n_products` | front | `favorites/FavoritesPage.tsx`, sur « Terminer » |
-| `checklist_item_viewed` | `item` | front | `home/Checklist.tsx`, une fois par session et par item |
+| `checklist_item_viewed` | `item` | front | `home/Checklist.tsx`, une fois par session et par item, pas sous la modale de bienvenue |
 | `checklist_item_clicked` | `item` | front | `home/Checklist.tsx` |
 | `checklist_item_completed` | `item` | serveur | `services/onboarding.ts`, quand un item passe à « fait » |
 | `checklist_dismissed` | `n_items_done` | front | `home/Checklist.tsx`, fermeture définitive |
@@ -137,7 +137,8 @@ on peut la garder ouverte dans un second onglet pendant qu'on parcourt l'app.
   fait à la lecture, sur les horodatages serveur :
   - **inscription** = `signup_completed` − `signup_started` (même `anonymous_id`) ;
   - **tutoriel** = premier `reco_sent` vers le patient test − `guide_step_viewed` étape 1 ;
-  - **une reco** = `reco_sent` − le `reco_started` juste avant, chaque départ ne servant qu'une fois.
+  - **une reco** = `reco_sent` − le `reco_started` juste avant, chaque départ ne servant qu'une fois. La reco
+    test est exclue, puisqu'elle compte déjà dans le tutoriel.
 - **Les events**, du plus récent au plus ancien, avec le compte ou l'identifiant anonyme et les props.
 - **« Vider les events »** (deux clics) efface la table `events`, sans toucher au reste.
 

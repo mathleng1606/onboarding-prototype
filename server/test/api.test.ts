@@ -447,6 +447,16 @@ describe('durations (/debug)', () => {
     assert.equal(d.reco.medianSeconds, 120);
   });
 
+  test('the test reco is not a reco duration (it is the tutorial), and its start is not reused', async () => {
+    await signup();
+    put('reco_started', { source: 'guide' }, at(0));
+    put('reco_sent', { is_test_patient: true, source: 'guide', n_products: 1 }, at(2));
+    put('reco_sent', { is_test_patient: false, source: 'accueil', n_products: 1 }, at(5)); // no start of its own
+    put('reco_started', { source: 'accueil' }, at(10));
+    put('reco_sent', { is_test_patient: false, source: 'accueil', n_products: 1 }, at(11));
+    assert.deepEqual(seconds((await durations()).reco), [60]);
+  });
+
   test('pauses are kept: a 2-hour break counts as is', async () => {
     await signup();
     put('reco_started', { source: 'accueil' }, '2026-01-01 08:00:00.000');

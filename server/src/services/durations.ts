@@ -6,7 +6,8 @@ import type { EventRow } from './events.ts';
  * DURATIONS, computed when read from the events (never stored), on the server timestamps:
  * - signup   = signup_completed − signup_started (same anonymous_id: the account does not exist yet at the start);
  * - tutorial = first reco_sent to the test patient − first guide_step_viewed step 1 (same account);
- * - reco     = reco_sent − the reco_started just before it (same account, each reco_started used once).
+ * - reco     = reco_sent − the reco_started just before it (same account, each reco_started used once);
+ *   real recos only: the test reco is the tutorial's, it still uses up its reco_started.
  * Pauses are not removed: the raw time is shown, the analysis decides what to do with long ones.
  */
 export type Sample = { who: string; startedAt: string; endedAt: string; seconds: number };
@@ -53,7 +54,7 @@ function reco(events: Ev[]): Sample[] {
     for (const e of evs) {
       if (e.name === 'reco_started') start = e;
       else if (e.name === 'reco_sent' && start) {
-        samples.push(sample(account, start, e));
+        if (e.props.is_test_patient !== true) samples.push(sample(account, start, e));
         start = null;
       }
     }

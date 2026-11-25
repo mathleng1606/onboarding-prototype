@@ -55,7 +55,7 @@ export function FirstSteps({ onboarding, theme }: { onboarding: Onboarding; them
 /** The checklist « X » collapses it until the end of this browser session. */
 const COLLAPSED_KEY = 'checklist-collapsed';
 
-/** checklist_item_viewed: each item still to do that is shown, once per browser session. */
+/** checklist_item_viewed: each item still to do that is visible, once per browser session. */
 function useItemsViewed(keys: ChecklistItemKey[]) {
   const shown = keys.join(',');
   useEffect(() => {
@@ -122,7 +122,8 @@ function Checklist({
 }) {
   const w = useWording();
   const act = useItemAction();
-  useItemsViewed(onboarding.items.filter((i) => !i.done).map((i) => i.key));
+  // Not while the welcome modal covers the checklist: the items are not seen yet.
+  useItemsViewed(onboarding.showWelcome ? [] : onboarding.items.filter((i) => !i.done).map((i) => i.key));
   const title: Record<ChecklistItemKey, string> = {
     account: 'Créer votre compte',
     test_recommendation: w.checklistItem2Title,

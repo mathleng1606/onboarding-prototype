@@ -40,7 +40,7 @@ export function DebugPage() {
         <section aria-label="Durées" className="grid gap-4 md:grid-cols-3">
           <DurationCard title="Inscription" rule="signup_completed − signup_started" m={durations.data?.signup} />
           <DurationCard title="Tutoriel" rule="reco_sent (test) − guide_step_viewed (étape 1)" m={durations.data?.tutorial} />
-          <DurationCard title="Une recommandation" rule="reco_sent − reco_started" m={durations.data?.reco} />
+          <DurationCard title="Une recommandation" rule="reco_sent − reco_started (hors reco test)" m={durations.data?.reco} />
         </section>
         <p className="m-0 text-xs text-ink-muted">
           Temps bruts, pauses comprises : rien n'est retiré, l'analyse décide quoi faire des longues pauses.
