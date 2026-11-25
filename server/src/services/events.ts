@@ -1,16 +1,6 @@
-import { z } from 'zod';
 import type { DB } from '../db/index.ts';
 import { iso } from '../lib.ts';
 import type { PractitionerRow } from './practitioners.ts';
-
-/** Where a recommendation was started from (reco_started, reco_sent). */
-export const RECO_SOURCES = ['guide', 'accueil', 'checklist', 'patients'] as const;
-
-export const eventSchema = z.strictObject({
-  name: z.string().regex(/^[a-z][a-z0-9_]*$/, 'snake_case expected').max(64),
-  anonymousId: z.uuid().optional(),
-  props: z.record(z.string(), z.unknown()).default({}),
-});
 
 /**
  * Writes one event. The server decides who it belongs to and when:
@@ -52,6 +42,20 @@ export type EventRow = {
   props: string;
   created_at: string;
 };
+
+/** signup_completed: the anonymous events of this browser now belong to the account. */
+export function linkAnonymousEvents(db: DB, p: PractitionerRow, anonymousId: string) {
+  db.prepare(`UPDATE events SET account_uid = ? WHERE anonymous_id = ? AND account_uid IS NULL`).run(p.uid, anonymousId);
+}
+
+/** Whole days between the end of the signup and now (session_started). */
+export function daysSinceSignup(db: DB, p: PractitionerRow): number | null {
+  if (p.signup_completed_at === null) return null;
+  const { days } = db.prepare(`SELECT CAST(julianday('now') - julianday(?) AS INTEGER) AS days`).get(p.signup_completed_at) as {
+    days: number;
+  };
+  return days;
+}
 
 /** The practitioner's events, plus the anonymous ones that were linked to the account at signup. */
 export function listEvents(db: DB, p: PractitionerRow, limit: number) {

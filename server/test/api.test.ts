@@ -19,7 +19,7 @@ async function call(method: string, url: string, payload?: unknown) {
 const done = (o: { items: { key: string; done: boolean }[] }) =>
   Object.fromEntries(o.items.map((i) => [i.key, i.done]));
 
-async function signup() {
+async function signup(anonymousId?: string) {
   await call('PATCH', P, {
     firstName: 'Camille',
     lastName: 'Roche',
@@ -27,7 +27,7 @@ async function signup() {
     profession: 'naturopath',
     recoFrequency: '1_5',
   });
-  return call('POST', `${P}/signup/complete`);
+  return call('POST', `${P}/signup/complete`, anonymousId ? { anonymousId } : undefined);
 }
 
 async function sendRecoTo(patientUid: string) {
@@ -331,3 +331,64 @@ describe('server events (aligned names)', () => {
     assert.equal((await call('POST', `${P}/recommendations/${created.body.uid}/send`, { source: 'ailleurs' })).status, 422);
   });
 });
+
+const ANON = '0f9e8d7c-6b5a-4c3d-8e2f-1a2b3c4d5e6f';
+const track = (name: string, props: Record<string, unknown> = {}, anonymousId: string | null = ANON) =>
+  call('POST', `${P}/events`, { name, props, ...(anonymousId ? { anonymousId } : {}) });
+
+describe('POST /events', () => {
+  test('a known event with its exact props is accepted, the server adds the common props', async () => {
+    const res = await track('signup_step_completed', { step: 3, volume_declared: '6_10' });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.anonymousId, ANON);
+    assert.equal(res.body.accountUid, null); // no account before the signup is completed
+    assert.deepEqual(res.body.props, { step: 3, volume_declared: '6_10', profession: null });
+  });
+
+  test('before the signup, an event without anonymous_id is refused', async () => {
+    assert.equal((await track('signup_started', {}, null)).status, 422);
+  });
+
+  test('signup_completed links the anonymous events to the account', async () => {
+    await track('signup_started');
+    await signup(ANON);
+    const events = (await call('GET', `${P}/events`)).body.reverse();
+    const started = events.find((e: { name: string }) => e.name === 'signup_started');
+    const completed = events.find((e: { name: string }) => e.name === 'signup_completed');
+    assert.equal(started.accountUid, PRACTITIONER_UID);
+    assert.equal(completed.anonymousId, ANON);
+    assert.equal(completed.accountUid, PRACTITIONER_UID);
+  });
+
+  test('after the signup, the account is set by the server and session_started gets days_since_signup', async () => {
+    await signup();
+    const res = await track('session_started', {}, null);
+    assert.equal(res.status, 201);
+    assert.equal(res.body.accountUid, PRACTITIONER_UID);
+    assert.equal(res.body.props.days_since_signup, 0);
+  });
+
+  test('refused, with the usual error format', async () => {
+    const cases: [string, Record<string, unknown>][] = [
+      ['guide_started', {}], //                                 unknown name
+      ['patient_order_paid', { reco_id: 'x' }], //             out of the prototype
+      ['reco_sent', { is_test_patient: true }], //             server only
+      ['reco_started', { source: 'ailleurs' }], //             unknown value
+      ['reco_started', {}], //                                 missing prop
+      ['reco_started', { source: 'guide', extra: 1 }], //      unexpected prop
+      ['patient_created', { source: 'checklist', email: 'a@b.fr' }], // patient data: key
+      ['tool_connected', { tool: 'claire.martin@example.com' }], //     patient data: value
+      ['patient_created', { source: 'checklist', nom: 'Martin' }],
+      ['protocol_created', { note: '+32 470 12 34 56' }], //            phone number
+    ];
+    for (const [name, props] of cases) {
+      const res = await track(name, props);
+      assert.equal(res.status, 422, `${name} ${JSON.stringify(props)}`);
+      assert.equal(res.body.error.code, 'validation_error');
+      assert.equal(typeof res.body.error.message, 'string');
+    }
+    assert.equal((await call('POST', `${P}/events`, { name: 'session_started', createdAt: '2020-01-01' })).status, 422);
+    assert.equal((await call('GET', `${P}/events`)).body.length, 0);
+  });
+});
+

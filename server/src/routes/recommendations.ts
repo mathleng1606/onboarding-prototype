@@ -1,7 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { parse } from '../lib.ts';
 import { z } from 'zod';
-import { RECO_SOURCES, recordEvent } from '../services/events.ts';
+import { RECO_SOURCES } from '../services/eventCatalog.ts';
+import { recordEvent } from '../services/events.ts';
 import { computeOnboarding, withOnboardingTracking } from '../services/onboarding.ts';
 import { reloadPractitioner } from '../services/practitioners.ts';
 import {
