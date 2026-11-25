@@ -16,7 +16,8 @@ export function StepDots({ current }: { current: 1 | 2 | 3 }) {
           <span
             className={cx(
               'flex-none box-border w-5 h-5 rounded-full flex items-center justify-center text-11 font-medium',
-              n <= current ? 'bg-brand-900 text-white' : 'bg-border text-ink-muted',
+              // Steps to come: #B9C8C8 (not a design-system token).
+              n <= current ? 'bg-brand-900 text-white' : 'bg-[#B9C8C8] text-ink-muted',
             )}
           >
             {n < current ? (
